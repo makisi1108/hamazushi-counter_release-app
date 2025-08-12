@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>はま寿司注文カウンター</title>
+<style>
+  body { font-family: "Hiragino Kaku Gothic ProN", sans-serif, sans-serif; background:#f8f8f8; margin:0; }
+  header { background:#002060; color:#fff; padding:1rem; display:flex; align-items:center; }
+  header img { height:40px; margin-right:1rem; }
+  h1 { font-size:1.5rem; margin:0; }
+  .summary { padding:1rem; text-align:center; font-size:1.2rem; }
+  .summary span { color:red; border:2px solid red; padding:0.4em 0.8em; border-radius:6px; font-weight:bold; }
+  .controls { text-align:center; margin-bottom:1rem; }
+  .controls button { color:#fff; border:none; padding:0.5rem 1rem; margin:0.5rem; border-radius:4px; cursor:pointer; font-weight:bold; }
+  #undo { background:#fbbf24; }
+  #undo:hover { background:#f59e0b; }
+  #reset { background:#ef4444; }
+  #reset:hover { background:#dc2626; }
+  .category-list { display:flex; flex-wrap:wrap; justify-content:center; gap:0.5rem; margin-bottom:1rem; padding:0 1rem; }
+  .category-list button { background:#2563eb; color:#fff; border:none; padding:0.5rem 1rem; border-radius:4px; cursor:pointer; }
+  .category-list button.active { background:#1e40af; }
+  .menu-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem; padding:1rem; }
+  .item { background:#fff; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; padding:0.5rem; }
+  .item img { width:100%; border-radius:4px; }
+  .item button { background:#ff4b00; color:#fff; border:none; padding:0.5rem 1rem; margin-top:0.5rem; border-radius:4px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="hama_sushi_images/%E3%81%AF%E3%81%BE%E5%AF%BF%E5%8F%B8%E3%83%AD%E3%82%B4.png" alt="はま寿司ロゴ" />
+  <h1>はま寿司注文カウンター</h1>
+</header>
+
+<div class="summary">
+  <span id="totalDisplay">合計金額: ¥0（0皿）</span>
+</div>
+
+<div class="controls">
+  <button id="undo">戻る</button>
+  <button id="reset">リセット</button>
+</div>
+
+<div class="category-list" id="categories"></div>
+
+<div class="menu-grid" id="menu"></div>
+
+<script>
+  // ここにJSONデータを直接貼るイメージで定義（category, name, price, image）
+  const menuData = 
+[
+  {
+    "category": "期間限定",
+    "name": "直火焼きまぐろ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%9B%B4%E7%81%AB%E7%84%BC%E3%81%8D%E3%81%BE%E3%81%90%E3%82%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "コーンの天ぷら握り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%82%B3%E3%83%BC%E3%83%B3%E3%81%AE%E5%A4%A9%E3%81%B7%E3%82%89%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "コーンの天ぷら握りマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%82%B3%E3%83%BC%E3%83%B3%E3%81%AE%E5%A4%A9%E3%81%B7%E3%82%89%E6%8F%A1%E3%82%8A%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "とろびんちょう 塩ごま油",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%20%E5%A1%A9%E3%81%94%E3%81%BE%E6%B2%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "えび 塩ごま油",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%88%E3%81%B3%20%E5%A1%A9%E3%81%94%E3%81%BE%E6%B2%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "厳選まぐろ中とろ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り厳選まぐろ中とろゆず塩",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "えび天握りシャキシャキ葱チリソース",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%88%E3%81%B3%E5%A4%A9%E6%8F%A1%E3%82%8A%E3%82%B7%E3%83%A3%E3%82%AD%E3%82%B7%E3%83%A3%E3%82%AD%E8%91%B1%E3%83%81%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "いか天握りシャキシャキ葱チリソース",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%84%E3%81%8B%E5%A4%A9%E6%8F%A1%E3%82%8A%E3%82%B7%E3%83%A3%E3%82%AD%E3%82%B7%E3%83%A3%E3%82%AD%E8%91%B1%E3%83%81%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙りとろ煮穴子",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E3%81%A8%E3%82%8D%E7%85%AE%E7%A9%B4%E5%AD%90.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "白とり貝",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%99%BD%E3%81%A8%E3%82%8A%E8%B2%9D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "あわび",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%82%E3%82%8F%E3%81%B3.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "しめさばおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%97%E3%82%81%E3%81%95%E3%81%B0%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "えびおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%88%E3%81%B3%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "えび天握りおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%88%E3%81%B3%E5%A4%A9%E6%8F%A1%E3%82%8A%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "いか天握りおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%84%E3%81%8B%E5%A4%A9%E6%8F%A1%E3%82%8A%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "豚塩カルビおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E8%B1%9A%E5%A1%A9%E3%82%AB%E3%83%AB%E3%83%93%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "合鴨おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E5%90%88%E9%B4%A8%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "生ハムおろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%94%9F%E3%83%8F%E3%83%A0%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "重ね厳選まぐろ中とろ",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E9%87%8D%E3%81%AD%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り重ね厳選まぐろ中とろゆず塩",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E9%87%8D%E3%81%AD%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "うに軍艦",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%86%E3%81%AB%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "うにいくら軍艦",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%86%E3%81%AB%E3%81%84%E3%81%8F%E3%82%89%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "地中海産本鮪大とろ",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E5%9C%B0%E4%B8%AD%E6%B5%B7%E7%94%A3%E6%9C%AC%E9%AE%AA%E5%A4%A7%E3%81%A8%E3%82%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り地中海産本鮪大とろゆず塩",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E5%9C%B0%E4%B8%AD%E6%B5%B7%E7%94%A3%E6%9C%AC%E9%AE%AA%E5%A4%A7%E3%81%A8%E3%82%8D%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "仙台牛握り",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E4%BB%99%E5%8F%B0%E7%89%9B%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り仙台牛握り",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E4%BB%99%E5%8F%B0%E7%89%9B%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り仙台牛握り_山わさびのせ",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E4%BB%99%E5%8F%B0%E7%89%9B%E6%8F%A1%E3%82%8A_%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3%E3%81%AE%E3%81%9B.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "炙り仙台牛握り_特製ソース",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%82%99%E3%82%8A%E4%BB%99%E5%8F%B0%E7%89%9B%E6%8F%A1%E3%82%8A_%E7%89%B9%E8%A3%BD%E3%82%BD%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "まぐろづくし",
+    "price": 580,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%BE%E3%81%90%E3%82%8D%E3%81%A5%E3%81%8F%E3%81%97.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "博多とんこつラーメン",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E5%8D%9A%E5%A4%9A%E3%81%A8%E3%82%93%E3%81%93%E3%81%A4%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "焼豚増量博多とんこつラーメン",
+    "price": 460,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E7%84%BC%E8%B1%9A%E5%A2%97%E9%87%8F%E5%8D%9A%E5%A4%9A%E3%81%A8%E3%82%93%E3%81%93%E3%81%A4%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "旨辛とんこつラーメン",
+    "price": 460,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E6%97%A8%E8%BE%9B%E3%81%A8%E3%82%93%E3%81%93%E3%81%A4%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "濃厚冷やし担々麺",
+    "price": 430,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E6%BF%83%E5%8E%9A%E5%86%B7%E3%82%84%E3%81%97%E6%8B%85%E3%80%85%E9%BA%BA.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "濃厚冷やし担々麺_花椒付き",
+    "price": 430,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E6%BF%83%E5%8E%9A%E5%86%B7%E3%82%84%E3%81%97%E6%8B%85%E3%80%85%E9%BA%BA_%E8%8A%B1%E6%A4%92%E4%BB%98%E3%81%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "2種のチーズのカルボナーラ風茶碗蒸し",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/2%E7%A8%AE%E3%81%AE%E3%83%81%E3%83%BC%E3%82%BA%E3%81%AE%E3%82%AB%E3%83%AB%E3%83%9C%E3%83%8A%E3%83%BC%E3%83%A9%E9%A2%A8%E8%8C%B6%E7%A2%97%E8%92%B8%E3%81%97.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "親鶏の炭火焼き",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E8%A6%AA%E9%B6%8F%E3%81%AE%E7%82%AD%E7%81%AB%E7%84%BC%E3%81%8D.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "さわやか2色のメロンパルフェ",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%95%E3%82%8F%E3%82%84%E3%81%8B2%E8%89%B2%E3%81%AE%E3%83%A1%E3%83%AD%E3%83%B3%E3%83%91%E3%83%AB%E3%83%95%E3%82%A7.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "クッキー＆クリームレアチーズケーキ",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%82%AF%E3%83%83%E3%82%AD%E3%83%BC%EF%BC%86%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%A0%E3%83%AC%E3%82%A2%E3%83%81%E3%83%BC%E3%82%BA%E3%82%B1%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "はまとろっミルクアイス",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E3%81%AF%E3%81%BE%E3%81%A8%E3%82%8D%E3%81%A3%E3%83%9F%E3%83%AB%E3%82%AF%E3%82%A2%E3%82%A4%E3%82%B9.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "国産メロン",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E5%9B%BD%E7%94%A3%E3%83%A1%E3%83%AD%E3%83%B3.png"
+  },
+  {
+    "category": "期間限定",
+    "name": "極きわみ",
+    "price": 1,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E6%A5%B5%E3%81%8D%E3%82%8F%E3%81%BF.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "まぐろ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "特製漬けまぐろ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%89%B9%E8%A3%BD%E6%BC%AC%E3%81%91%E3%81%BE%E3%81%90%E3%82%8D.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "まぐろレアステーキつつみ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD%E3%81%A4%E3%81%A4%E3%81%BF.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "とろびんちょう",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "とろびんちょう山わさび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "特製漬けとろびんちょう",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%89%B9%E8%A3%BD%E6%BC%AC%E3%81%91%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "とろたくつつみ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%9F%E3%81%8F%E3%81%A4%E3%81%A4%E3%81%BF.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "とろたくユッケつつみ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%9F%E3%81%8F%E3%83%A6%E3%83%83%E3%82%B1%E3%81%A4%E3%81%A4%E3%81%BF.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "まぐろ二種盛り_まぐろ・とろびんちょう",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E4%BA%8C%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%BE%E3%81%90%E3%82%8D%E3%83%BB%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "まぐろ二種盛り_とろびんちょう・とろたく",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E4%BA%8C%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%E3%83%BB%E3%81%A8%E3%82%8D%E3%81%9F%E3%81%8F.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "まぐろ二種盛り_まぐろ・とろたく",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E4%BA%8C%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%BE%E3%81%90%E3%82%8D%E3%83%BB%E3%81%A8%E3%82%8D%E3%81%9F%E3%81%8F.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "サーモン",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "サーモンゆず塩",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "サーモン山わさび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "大とろサーモン",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E5%A4%A7%E3%81%A8%E3%82%8D%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "大とろサーモン山わさび",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E5%A4%A7%E3%81%A8%E3%82%8D%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "サーモンつつみ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%81%A4%E3%81%A4%E3%81%BF.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "しめさば",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%97%E3%82%81%E3%81%95%E3%81%B0.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "炙りしめさば",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%97%E3%82%81%E3%81%95%E3%81%B0.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "生えび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%94%9F%E3%81%88%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "甘えび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%94%98%E3%81%88%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "えび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%88%E3%81%B3.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "炙りえびマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%88%E3%81%B3%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "えび天握り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%88%E3%81%B3%E5%A4%A9%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "えび天",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%88%E3%81%B3%E5%A4%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "アカイカ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "アカイカゆず塩",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "大葉漬けアカイカ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E5%A4%A7%E8%91%89%E6%BC%AC%E3%81%91%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "旨だしたまご",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E6%97%A8%E3%81%A0%E3%81%97%E3%81%9F%E3%81%BE%E3%81%94.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "旨だしたまごマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E6%97%A8%E3%81%A0%E3%81%97%E3%81%9F%E3%81%BE%E3%81%94%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "わさびなす",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%8F%E3%81%95%E3%81%B3%E3%81%AA%E3%81%99.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "煮あなご",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%85%AE%E3%81%82%E3%81%AA%E3%81%94.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "煮あなごゆず塩",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E7%85%AE%E3%81%82%E3%81%AA%E3%81%94%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "れんこん天握り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%8C%E3%82%93%E3%81%93%E3%82%93%E5%A4%A9%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "れんこん天",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%8C%E3%82%93%E3%81%93%E3%82%93%E5%A4%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "オクラ天握り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%AA%E3%82%AF%E3%83%A9%E5%A4%A9%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "オクラ天",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%82%AA%E3%82%AF%E3%83%A9%E5%A4%A9.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "いか天握り",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%84%E3%81%8B%E5%A4%A9%E6%8F%A1%E3%82%8A.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "いか天握りガーリックマヨ",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%84%E3%81%8B%E5%A4%A9%E6%8F%A1%E3%82%8A%E3%82%AC%E3%83%BC%E3%83%AA%E3%83%83%E3%82%AF%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "にぎり",
+    "name": "いか天",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%81%AB%E3%81%8E%E3%82%8A/%E3%81%84%E3%81%8B%E5%A4%A9.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "生ハム",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%94%9F%E3%83%8F%E3%83%A0.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "生ハムマヨオニオン",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%94%9F%E3%83%8F%E3%83%A0%E3%83%9E%E3%83%A8%E3%82%AA%E3%83%8B%E3%82%AA%E3%83%B3.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "合鴨",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E5%90%88%E9%B4%A8.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "合鴨マヨオニオン",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E5%90%88%E9%B4%A8%E3%83%9E%E3%83%A8%E3%82%AA%E3%83%8B%E3%82%AA%E3%83%B3.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "合鴨ガーリックソース",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E5%90%88%E9%B4%A8%E3%82%AC%E3%83%BC%E3%83%AA%E3%83%83%E3%82%AF%E3%82%BD%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "合鴨山わさび",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E5%90%88%E9%B4%A8%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "炙り合鴨",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%82%99%E3%82%8A%E5%90%88%E9%B4%A8.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "豚塩カルビ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E8%B1%9A%E5%A1%A9%E3%82%AB%E3%83%AB%E3%83%93.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "豚塩カルビマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E8%B1%9A%E5%A1%A9%E3%82%AB%E3%83%AB%E3%83%93%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "直火焼き牛カルビ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%9B%B4%E7%81%AB%E7%84%BC%E3%81%8D%E7%89%9B%E3%82%AB%E3%83%AB%E3%83%93.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "直火焼き牛カルビ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%9B%B4%E7%81%AB%E7%84%BC%E3%81%8D%E7%89%9B%E3%82%AB%E3%83%AB%E3%83%93.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "直火焼き牛カルビマヨ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%9B%B4%E7%81%AB%E7%84%BC%E3%81%8D%E7%89%9B%E3%82%AB%E3%83%AB%E3%83%93%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "ローストビーフ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E3%83%AD%E3%83%BC%E3%82%B9%E3%83%88%E3%83%93%E3%83%BC%E3%83%95.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "ローストビーフガーリックソース",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E3%83%AD%E3%83%BC%E3%82%B9%E3%83%88%E3%83%93%E3%83%BC%E3%83%95%E3%82%AC%E3%83%BC%E3%83%AA%E3%83%83%E3%82%AF%E3%82%BD%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "ローストビーフガーリックソース山わさび",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E3%83%AD%E3%83%BC%E3%82%B9%E3%83%88%E3%83%93%E3%83%BC%E3%83%95%E3%82%AC%E3%83%BC%E3%83%AA%E3%83%83%E3%82%AF%E3%82%BD%E3%83%BC%E3%82%B9%E5%B1%B1%E3%82%8F%E3%81%95%E3%81%B3.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "ハンバーグ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E3%83%8F%E3%83%B3%E3%83%90%E3%83%BC%E3%82%B0.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "ハンバーグマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E3%83%8F%E3%83%B3%E3%83%90%E3%83%BC%E3%82%B0%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "肉握り",
+    "name": "炙りハンバーグチーズマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%82%89%E6%8F%A1%E3%82%8A/%E7%82%99%E3%82%8A%E3%83%8F%E3%83%B3%E3%83%90%E3%83%BC%E3%82%B0%E3%83%81%E3%83%BC%E3%82%BA%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "まぐろたたき軍艦",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%BE%E3%81%90%E3%82%8D%E3%81%9F%E3%81%9F%E3%81%8D%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "ピリ辛まぐろたたきユッケ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%83%94%E3%83%AA%E8%BE%9B%E3%81%BE%E3%81%90%E3%82%8D%E3%81%9F%E3%81%9F%E3%81%8D%E3%83%A6%E3%83%83%E3%82%B1.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "まぐろたたき納豆",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%BE%E3%81%90%E3%82%8D%E3%81%9F%E3%81%9F%E3%81%8D%E7%B4%8D%E8%B1%86.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "たっぷりかにみそ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%9F%E3%81%A3%E3%81%B7%E3%82%8A%E3%81%8B%E3%81%AB%E3%81%BF%E3%81%9D.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "大葉かにみそ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%A4%A7%E8%91%89%E3%81%8B%E3%81%AB%E3%81%BF%E3%81%9D.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "かにマヨ軍艦",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%8B%E3%81%AB%E3%83%9E%E3%83%A8%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "たらマヨ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%9F%E3%82%89%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "大葉たらこ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%A4%A7%E8%91%89%E3%81%9F%E3%82%89%E3%81%93.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "コーン",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%82%B3%E3%83%BC%E3%83%B3.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "ツナ＆コーン",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%83%84%E3%83%8A%EF%BC%86%E3%82%B3%E3%83%BC%E3%83%B3.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "ツナサラダ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%83%84%E3%83%8A%E3%82%B5%E3%83%A9%E3%83%80.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "ツナキムチ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%83%84%E3%83%8A%E3%82%AD%E3%83%A0%E3%83%81.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "シーフードサラダ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%82%B7%E3%83%BC%E3%83%95%E3%83%BC%E3%83%89%E3%82%B5%E3%83%A9%E3%83%80.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "いかオクラ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%84%E3%81%8B%E3%82%AA%E3%82%AF%E3%83%A9.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "いかオクラ納豆",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%84%E3%81%8B%E3%82%AA%E3%82%AF%E3%83%A9%E7%B4%8D%E8%B1%86.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "納豆",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E7%B4%8D%E8%B1%86.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "納豆キムチ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E7%B4%8D%E8%B1%86%E3%82%AD%E3%83%A0%E3%83%81.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "山かけいかオクラ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%B1%B1%E3%81%8B%E3%81%91%E3%81%84%E3%81%8B%E3%82%AA%E3%82%AF%E3%83%A9.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "山かけたらこ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%B1%B1%E3%81%8B%E3%81%91%E3%81%9F%E3%82%89%E3%81%93.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "山かけ納豆",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%B1%B1%E3%81%8B%E3%81%91%E7%B4%8D%E8%B1%86.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "山かけまぐろ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E5%B1%B1%E3%81%8B%E3%81%91%E3%81%BE%E3%81%90%E3%82%8D.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "わさびえんがわ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%82%8F%E3%81%95%E3%81%B3%E3%81%88%E3%82%93%E3%81%8C%E3%82%8F.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "かっぱ巻",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%8B%E3%81%A3%E3%81%B1%E5%B7%BB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "たくあん巻_ごま入り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%9F%E3%81%8F%E3%81%82%E3%82%93%E5%B7%BB_%E3%81%94%E3%81%BE%E5%85%A5%E3%82%8A.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "納豆巻",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E7%B4%8D%E8%B1%86%E5%B7%BB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "鉄火巻",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E9%89%84%E7%81%AB%E5%B7%BB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "まぐろたたき巻",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%BE%E3%81%90%E3%82%8D%E3%81%9F%E3%81%9F%E3%81%8D%E5%B7%BB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "生ハムロール",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E7%94%9F%E3%83%8F%E3%83%A0%E3%83%AD%E3%83%BC%E3%83%AB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "カリフォルニアロール",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%82%AB%E3%83%AA%E3%83%95%E3%82%A9%E3%83%AB%E3%83%8B%E3%82%A2%E3%83%AD%E3%83%BC%E3%83%AB.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "いなり_ごま入り",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E3%81%84%E3%81%AA%E3%82%8A_%E3%81%94%E3%81%BE%E5%85%A5%E3%82%8A.png"
+  },
+  {
+    "category": "軍艦・細巻き・その他",
+    "name": "特製キンパ風ツナキムチ太巻",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%B0%E5%B7%BB%E3%81%8D%E3%83%BB%E3%81%9D%E3%81%AE%E4%BB%96/%E7%89%B9%E8%A3%BD%E3%82%AD%E3%83%B3%E3%83%91%E9%A2%A8%E3%83%84%E3%83%8A%E3%82%AD%E3%83%A0%E3%83%81%E5%A4%AA%E5%B7%BB.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "まぐろレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "とろびんちょうレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモンレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えびレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%81%B3%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "アカイカレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "天然赤えび",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%A4%A9%E7%84%B6%E8%B5%A4%E3%81%88%E3%81%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "天然赤えび 塩レモン",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%A4%A9%E7%84%B6%E8%B5%A4%E3%81%88%E3%81%B3%20%E5%A1%A9%E3%83%AC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙り天然赤えび 塩レモン",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E5%A4%A9%E7%84%B6%E8%B5%A4%E3%81%88%E3%81%B3%20%E5%A1%A9%E3%83%AC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "天然赤えびレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%A4%A9%E7%84%B6%E8%B5%A4%E3%81%88%E3%81%B3%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "活〆はまち",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E6%B4%BB%E3%80%86%E3%81%AF%E3%81%BE%E3%81%A1.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りはまちゆず塩",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%AF%E3%81%BE%E3%81%A1%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "活〆まだい",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E6%B4%BB%E3%80%86%E3%81%BE%E3%81%A0%E3%81%84.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りまだいゆず塩",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%BE%E3%81%A0%E3%81%84%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りうなぎ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%86%E3%81%AA%E3%81%8E.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "ほたて",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%BB%E3%81%9F%E3%81%A6.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りほたて",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%BB%E3%81%9F%E3%81%A6.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "ほたてレアステーキ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%BB%E3%81%9F%E3%81%A6%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "つぶ貝",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A4%E3%81%B6%E8%B2%9D.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "赤貝",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E8%B5%A4%E8%B2%9D.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "真だこ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%9C%9F%E3%81%A0%E3%81%93.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えんがわ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%82%93%E3%81%8C%E3%82%8F.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りえんがわ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%88%E3%82%93%E3%81%8C%E3%82%8F.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りえびチーズマヨ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%88%E3%81%B3%E3%83%81%E3%83%BC%E3%82%BA%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りサーモンチーズマヨ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%81%E3%83%BC%E3%82%BA%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りたまごチーズマヨ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%9F%E3%81%BE%E3%81%94%E3%83%81%E3%83%BC%E3%82%BA%E3%83%9E%E3%83%A8.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "真あじ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%9C%9F%E3%81%82%E3%81%98.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "真あじ漁師漬け",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%9C%9F%E3%81%82%E3%81%98%E6%BC%81%E5%B8%AB%E6%BC%AC%E3%81%91.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "宮城県産とろいわし",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%AE%AE%E5%9F%8E%E7%9C%8C%E7%94%A3%E3%81%A8%E3%82%8D%E3%81%84%E3%82%8F%E3%81%97.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙り宮城県産とろいわし",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E5%AE%AE%E5%9F%8E%E7%9C%8C%E7%94%A3%E3%81%A8%E3%82%8D%E3%81%84%E3%82%8F%E3%81%97.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "宮城県産とろいわし漁師漬け",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%AE%AE%E5%9F%8E%E7%9C%8C%E7%94%A3%E3%81%A8%E3%82%8D%E3%81%84%E3%82%8F%E3%81%97%E6%BC%81%E5%B8%AB%E6%BC%AC%E3%81%91.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモンマヨオニオン",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%9E%E3%83%A8%E3%82%AA%E3%83%8B%E3%82%AA%E3%83%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモンマヨアボカド",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%9E%E3%83%A8%E3%82%A2%E3%83%9C%E3%82%AB%E3%83%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "とろびんちょうマヨアボカド",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%E3%83%9E%E3%83%A8%E3%82%A2%E3%83%9C%E3%82%AB%E3%83%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えびマヨアボカド",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%81%B3%E3%83%9E%E3%83%A8%E3%82%A2%E3%83%9C%E3%82%AB%E3%83%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "生ハムマヨアボカド",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%94%9F%E3%83%8F%E3%83%A0%E3%83%9E%E3%83%A8%E3%82%A2%E3%83%9C%E3%82%AB%E3%83%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモン おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "しめさば おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%97%E3%82%81%E3%81%95%E3%81%B0%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "炙りしめさば おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%82%99%E3%82%8A%E3%81%97%E3%82%81%E3%81%95%E3%81%B0%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "豚塩カルビ おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E8%B1%9A%E5%A1%A9%E3%82%AB%E3%83%AB%E3%83%93%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えび天握り おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%81%B3%E5%A4%A9%E6%8F%A1%E3%82%8A%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "いか天握り おろし盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%84%E3%81%8B%E5%A4%A9%E6%8F%A1%E3%82%8A%20%E3%81%8A%E3%82%8D%E3%81%97%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモン 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "生ハム 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%94%9F%E3%83%8F%E3%83%A0%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えび 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%81%B3%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "アカイカ 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "とろびんちょう 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "豚塩カルビ 旨辛ネギ盛り",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E8%B1%9A%E5%A1%A9%E3%82%AB%E3%83%AB%E3%83%93%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE%E7%9B%9B%E3%82%8A.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモンつつみ_いくらのせ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%81%A4%E3%81%A4%E3%81%BF_%E3%81%84%E3%81%8F%E3%82%89%E3%81%AE%E3%81%9B.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "大粒いくら",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E5%A4%A7%E7%B2%92%E3%81%84%E3%81%8F%E3%82%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "とろいくら",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A8%E3%82%8D%E3%81%84%E3%81%8F%E3%82%89.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "生しらす_日本近海産",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E7%94%9F%E3%81%97%E3%82%89%E3%81%99_%E6%97%A5%E6%9C%AC%E8%BF%91%E6%B5%B7%E7%94%A3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "つぶっこ_樺太ししゃも卵",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A4%E3%81%B6%E3%81%A3%E3%81%93_%E6%A8%BA%E5%A4%AA%E3%81%97%E3%81%97%E3%82%83%E3%82%82%E5%8D%B5.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "かに軍艦",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%8B%E3%81%AB%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "かにみそ軍艦",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%8B%E3%81%AB%E3%81%BF%E3%81%9D%E8%BB%8D%E8%89%A6.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "まぐろ三種盛り_まぐろ・とろびんちょう・とろたく",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%BE%E3%81%90%E3%82%8D%E3%83%BB%E3%81%A8%E3%82%8D%E3%81%B3%E3%82%93%E3%81%A1%E3%82%87%E3%81%86%E3%83%BB%E3%81%A8%E3%82%8D%E3%81%9F%E3%81%8F.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "いか三種盛り_真いか・アカイカ・大葉漬けアカイカ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%84%E3%81%8B%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E7%9C%9F%E3%81%84%E3%81%8B%E3%83%BB%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB%E3%83%BB%E5%A4%A7%E8%91%89%E6%BC%AC%E3%81%91%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "いか三種盛り_やりいか・アカイカ・大葉漬けアカイカ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%84%E3%81%8B%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%82%84%E3%82%8A%E3%81%84%E3%81%8B%E3%83%BB%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB%E3%83%BB%E5%A4%A7%E8%91%89%E6%BC%AC%E3%81%91%E3%82%A2%E3%82%AB%E3%82%A4%E3%82%AB.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サーモン三種盛り_サーモンレアステーキ・大とろサーモン・サーモン",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD%E3%83%BB%E5%A4%A7%E3%81%A8%E3%82%8D%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%BB%E3%82%B5%E3%83%BC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "えび三種盛り_えび・甘えび・生えび",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%88%E3%81%B3%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%88%E3%81%B3%E3%83%BB%E7%94%98%E3%81%88%E3%81%B3%E3%83%BB%E7%94%9F%E3%81%88%E3%81%B3.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "とろネバ三種盛り_まぐろたたき軍艦・納豆・いかオクラ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%81%A8%E3%82%8D%E3%83%8D%E3%83%90%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%81%BE%E3%81%90%E3%82%8D%E3%81%9F%E3%81%9F%E3%81%8D%E8%BB%8D%E8%89%A6%E3%83%BB%E7%B4%8D%E8%B1%86%E3%83%BB%E3%81%84%E3%81%8B%E3%82%AA%E3%82%AF%E3%83%A9.png"
+  },
+  {
+    "category": "贅沢握り・三種盛り",
+    "name": "サラダ軍艦三種盛り_シーフード・コーン・ツナ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%B4%85%E6%B2%A2%E6%8F%A1%E3%82%8A%E3%83%BB%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A/%E3%82%B5%E3%83%A9%E3%83%80%E8%BB%8D%E8%89%A6%E4%B8%89%E7%A8%AE%E7%9B%9B%E3%82%8A_%E3%82%B7%E3%83%BC%E3%83%95%E3%83%BC%E3%83%89%E3%83%BB%E3%82%B3%E3%83%BC%E3%83%B3%E3%83%BB%E3%83%84%E3%83%8A.png"
+  },
+  {
+    "category": "至福の一貫",
+    "name": "厳選まぐろ中とろ食べ比べ_中とろ・炙りゆず塩",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%87%B3%E7%A6%8F%E3%81%AE%E4%B8%80%E8%B2%AB/%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D%E9%A3%9F%E3%81%B9%E6%AF%94%E3%81%B9_%E4%B8%AD%E3%81%A8%E3%82%8D%E3%83%BB%E7%82%99%E3%82%8A%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "至福の一貫",
+    "name": "厳選まぐろ中とろ食べ比べ_中とろ・レアステーキ",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E8%87%B3%E7%A6%8F%E3%81%AE%E4%B8%80%E8%B2%AB/%E5%8E%B3%E9%81%B8%E3%81%BE%E3%81%90%E3%82%8D%E4%B8%AD%E3%81%A8%E3%82%8D%E9%A3%9F%E3%81%B9%E6%AF%94%E3%81%B9_%E4%B8%AD%E3%81%A8%E3%82%8D%E3%83%BB%E3%83%AC%E3%82%A2%E3%82%B9%E3%83%86%E3%83%BC%E3%82%AD.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "焼津産かつおだしの特製茶碗蒸し",
+    "price": 190,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E7%84%BC%E6%B4%A5%E7%94%A3%E3%81%8B%E3%81%A4%E3%81%8A%E3%81%A0%E3%81%97%E3%81%AE%E7%89%B9%E8%A3%BD%E8%8C%B6%E7%A2%97%E8%92%B8%E3%81%97.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "あおさみそ汁",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%82%E3%81%8A%E3%81%95%E3%81%BF%E3%81%9D%E6%B1%81.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "あさりみそ汁",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%82%E3%81%95%E3%82%8A%E3%81%BF%E3%81%9D%E6%B1%81.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "特製とん汁",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E7%89%B9%E8%A3%BD%E3%81%A8%E3%82%93%E6%B1%81.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "かけうどん",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%8B%E3%81%91%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "きつねうどん",
+    "price": 290,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%8D%E3%81%A4%E3%81%AD%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "えびの天ぷらそば",
+    "price": 330,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%88%E3%81%B3%E3%81%AE%E5%A4%A9%E3%81%B7%E3%82%89%E3%81%9D%E3%81%B0.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "えびの天ぷらうどん",
+    "price": 330,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%88%E3%81%B3%E3%81%AE%E5%A4%A9%E3%81%B7%E3%82%89%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "あさりとあおさのうどん",
+    "price": 360,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%82%E3%81%95%E3%82%8A%E3%81%A8%E3%81%82%E3%81%8A%E3%81%95%E3%81%AE%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "鴨そば",
+    "price": 360,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E9%B4%A8%E3%81%9D%E3%81%B0.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "鴨うどん",
+    "price": 360,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E9%B4%A8%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "えび天きつねうどん",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%88%E3%81%B3%E5%A4%A9%E3%81%8D%E3%81%A4%E3%81%AD%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "えび天鴨そば",
+    "price": 430,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%88%E3%81%B3%E5%A4%A9%E9%B4%A8%E3%81%9D%E3%81%B0.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "えび天鴨うどん",
+    "price": 430,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%88%E3%81%B3%E5%A4%A9%E9%B4%A8%E3%81%86%E3%81%A9%E3%82%93.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "特製しょう油ラーメン",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E7%89%B9%E8%A3%BD%E3%81%97%E3%82%87%E3%81%86%E6%B2%B9%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "焼豚増量特製しょう油ラーメン",
+    "price": 460,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E7%84%BC%E8%B1%9A%E5%A2%97%E9%87%8F%E7%89%B9%E8%A3%BD%E3%81%97%E3%82%87%E3%81%86%E6%B2%B9%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "厳選素材の貝節塩ラーメン",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E5%8E%B3%E9%81%B8%E7%B4%A0%E6%9D%90%E3%81%AE%E8%B2%9D%E7%AF%80%E5%A1%A9%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "焼豚増量厳選素材の貝節塩ラーメン",
+    "price": 460,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E7%84%BC%E8%B1%9A%E5%A2%97%E9%87%8F%E5%8E%B3%E9%81%B8%E7%B4%A0%E6%9D%90%E3%81%AE%E8%B2%9D%E7%AF%80%E5%A1%A9%E3%83%A9%E3%83%BC%E3%83%A1%E3%83%B3.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "鶏のから揚げ_4個",
+    "price": 330,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E9%B6%8F%E3%81%AE%E3%81%8B%E3%82%89%E6%8F%9A%E3%81%92_4%E5%80%8B.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "鶏のから揚げ_2個",
+    "price": 180,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E9%B6%8F%E3%81%AE%E3%81%8B%E3%82%89%E6%8F%9A%E3%81%92_2%E5%80%8B.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "なんこつのから揚げ",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%AA%E3%82%93%E3%81%93%E3%81%A4%E3%81%AE%E3%81%8B%E3%82%89%E6%8F%9A%E3%81%92.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "カリカリポテト",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%82%AB%E3%83%AA%E3%82%AB%E3%83%AA%E3%83%9D%E3%83%86%E3%83%88.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "カリカリポテト_バター醤油味",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%82%AB%E3%83%AA%E3%82%AB%E3%83%AA%E3%83%9D%E3%83%86%E3%83%88_%E3%83%90%E3%82%BF%E3%83%BC%E9%86%A4%E6%B2%B9%E5%91%B3.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "旨だしたこ焼き_3個",
+    "price": 180,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E6%97%A8%E3%81%A0%E3%81%97%E3%81%9F%E3%81%93%E7%84%BC%E3%81%8D_3%E5%80%8B.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "旨だしたこ焼き_6個",
+    "price": 330,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E6%97%A8%E3%81%A0%E3%81%97%E3%81%9F%E3%81%93%E7%84%BC%E3%81%8D_6%E5%80%8B.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "あさりの酒蒸し",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%81%82%E3%81%95%E3%82%8A%E3%81%AE%E9%85%92%E8%92%B8%E3%81%97.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "ツナとブロッコリーのタルタルサラダ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%83%84%E3%83%8A%E3%81%A8%E3%83%96%E3%83%AD%E3%83%83%E3%82%B3%E3%83%AA%E3%83%BC%E3%81%AE%E3%82%BF%E3%83%AB%E3%82%BF%E3%83%AB%E3%82%B5%E3%83%A9%E3%83%80.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "旨だし厚焼きたまご",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E6%97%A8%E3%81%A0%E3%81%97%E5%8E%9A%E7%84%BC%E3%81%8D%E3%81%9F%E3%81%BE%E3%81%94.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "旨だし厚焼きたまごおろし添え",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E6%97%A8%E3%81%A0%E3%81%97%E5%8E%9A%E7%84%BC%E3%81%8D%E3%81%9F%E3%81%BE%E3%81%94%E3%81%8A%E3%82%8D%E3%81%97%E6%B7%BB%E3%81%88.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "枝豆",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E6%9E%9D%E8%B1%86.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "キムチ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%82%AD%E3%83%A0%E3%83%81.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "〆シャリ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E3%80%86%E3%82%B7%E3%83%A3%E3%83%AA.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "追加トッピング 旨辛ネギ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E8%BF%BD%E5%8A%A0%E3%83%88%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%20%E6%97%A8%E8%BE%9B%E3%83%8D%E3%82%AE.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "追加トッピング 大根おろし",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E8%BF%BD%E5%8A%A0%E3%83%88%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%20%E5%A4%A7%E6%A0%B9%E3%81%8A%E3%82%8D%E3%81%97.png"
+  },
+  {
+    "category": "サイドメニュー",
+    "name": "追加トッピング ディップチーズ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%82%B5%E3%82%A4%E3%83%89%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC/%E8%BF%BD%E5%8A%A0%E3%83%88%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%20%E3%83%87%E3%82%A3%E3%83%83%E3%83%97%E3%83%81%E3%83%BC%E3%82%BA.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ミルクレープ",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%9F%E3%83%AB%E3%82%AF%E3%83%AC%E3%83%BC%E3%83%97.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "フランス直輸入濃厚ガトーショコラ",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%95%E3%83%A9%E3%83%B3%E3%82%B9%E7%9B%B4%E8%BC%B8%E5%85%A5%E6%BF%83%E5%8E%9A%E3%82%AC%E3%83%88%E3%83%BC%E3%82%B7%E3%83%A7%E3%82%B3%E3%83%A9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "たまごプリン",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%81%9F%E3%81%BE%E3%81%94%E3%83%97%E3%83%AA%E3%83%B3.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "黒蜜きなこ豆乳プリン",
+    "price": 180,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E9%BB%92%E8%9C%9C%E3%81%8D%E3%81%AA%E3%81%93%E8%B1%86%E4%B9%B3%E3%83%97%E3%83%AA%E3%83%B3.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "大学いも",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E5%A4%A7%E5%AD%A6%E3%81%84%E3%82%82.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "大学いもバニラアイス添え",
+    "price": 220,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E5%A4%A7%E5%AD%A6%E3%81%84%E3%82%82%E3%83%90%E3%83%8B%E3%83%A9%E3%82%A2%E3%82%A4%E3%82%B9%E6%B7%BB%E3%81%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "コーヒーゼリー_バニラアイスのせ",
+    "price": 180,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%B3%E3%83%BC%E3%83%92%E3%83%BC%E3%82%BC%E3%83%AA%E3%83%BC_%E3%83%90%E3%83%8B%E3%83%A9%E3%82%A2%E3%82%A4%E3%82%B9%E3%81%AE%E3%81%9B.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "コーヒーゼリー",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%B3%E3%83%BC%E3%83%92%E3%83%BC%E3%82%BC%E3%83%AA%E3%83%BC.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "チョコとバニラのはまパルフェ",
+    "price": 390,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%81%E3%83%A7%E3%82%B3%E3%81%A8%E3%83%90%E3%83%8B%E3%83%A9%E3%81%AE%E3%81%AF%E3%81%BE%E3%83%91%E3%83%AB%E3%83%95%E3%82%A7.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "三色だんご_こしあん入り",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E4%B8%89%E8%89%B2%E3%81%A0%E3%82%93%E3%81%94_%E3%81%93%E3%81%97%E3%81%82%E3%82%93%E5%85%A5%E3%82%8A.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "フレッシュパイン",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%95%E3%83%AC%E3%83%83%E3%82%B7%E3%83%A5%E3%83%91%E3%82%A4%E3%83%B3.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "波照間黒糖のわらびもち",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E6%B3%A2%E7%85%A7%E9%96%93%E9%BB%92%E7%B3%96%E3%81%AE%E3%82%8F%E3%82%89%E3%81%B3%E3%82%82%E3%81%A1.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "波照間黒糖のわらびもちバニラアイス添え",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E6%B3%A2%E7%85%A7%E9%96%93%E9%BB%92%E7%B3%96%E3%81%AE%E3%82%8F%E3%82%89%E3%81%B3%E3%82%82%E3%81%A1%E3%83%90%E3%83%8B%E3%83%A9%E3%82%A2%E3%82%A4%E3%82%B9%E6%B7%BB%E3%81%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "はまアイス_バニラ",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%81%AF%E3%81%BE%E3%82%A2%E3%82%A4%E3%82%B9_%E3%83%90%E3%83%8B%E3%83%A9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "はまアイス_チョコレート",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%81%AF%E3%81%BE%E3%82%A2%E3%82%A4%E3%82%B9_%E3%83%81%E3%83%A7%E3%82%B3%E3%83%AC%E3%83%BC%E3%83%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "豆乳いちごアイス",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E8%B1%86%E4%B9%B3%E3%81%84%E3%81%A1%E3%81%94%E3%82%A2%E3%82%A4%E3%82%B9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "追加トッピング ホイップ",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E8%BF%BD%E5%8A%A0%E3%83%88%E3%83%83%E3%83%94%E3%83%B3%E3%82%B0%20%E3%83%9B%E3%82%A4%E3%83%83%E3%83%97.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "コーラフロート",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%B3%E3%83%BC%E3%83%A9%E3%83%95%E3%83%AD%E3%83%BC%E3%83%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "メロンソーダフロート",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%A1%E3%83%AD%E3%83%B3%E3%82%BD%E3%83%BC%E3%83%80%E3%83%95%E3%83%AD%E3%83%BC%E3%83%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "コーヒーフロート",
+    "price": 270,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%B3%E3%83%BC%E3%83%92%E3%83%BC%E3%83%95%E3%83%AD%E3%83%BC%E3%83%88.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ペプシコーラ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%9A%E3%83%97%E3%82%B7%E3%82%B3%E3%83%BC%E3%83%A9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ホワイトウォーター",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88%E3%82%A6%E3%82%A9%E3%83%BC%E3%82%BF%E3%83%BC.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ホワイトソーダ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88%E3%82%BD%E3%83%BC%E3%83%80.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "メロンソーダ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%A1%E3%83%AD%E3%83%B3%E3%82%BD%E3%83%BC%E3%83%80.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ホワイトメロンソーダ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88%E3%83%A1%E3%83%AD%E3%83%B3%E3%82%BD%E3%83%BC%E3%83%80.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ゆずレモン",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%86%E3%81%9A%E3%83%AC%E3%83%A2%E3%83%B3.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ゆずレモンスパークリング",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%86%E3%81%9A%E3%83%AC%E3%83%A2%E3%83%B3%E3%82%B9%E3%83%91%E3%83%BC%E3%82%AF%E3%83%AA%E3%83%B3%E3%82%B0.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "なっちゃんオレンジ",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%81%AA%E3%81%A3%E3%81%A1%E3%82%83%E3%82%93%E3%82%AA%E3%83%AC%E3%83%B3%E3%82%B8.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "アップル100％ジュース",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%A2%E3%83%83%E3%83%97%E3%83%AB100%EF%BC%85%E3%82%B8%E3%83%A5%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "ぶどう100％ジュース",
+    "price": 120,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%81%B6%E3%81%A9%E3%81%86100%EF%BC%85%E3%82%B8%E3%83%A5%E3%83%BC%E3%82%B9.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "コーヒー（HOT ICE）",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%B3%E3%83%BC%E3%83%92%E3%83%BC%EF%BC%88HOT%20ICE%EF%BC%89.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "カフェラテ（HOT ICE）",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E3%82%AB%E3%83%95%E3%82%A7%E3%83%A9%E3%83%86%EF%BC%88HOT%20ICE%EF%BC%89.png"
+  },
+  {
+    "category": "デザート・ドリンク",
+    "name": "抹茶ラテ（HOT ICE）",
+    "price": 160,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E3%83%87%E3%82%B6%E3%83%BC%E3%83%88%E3%83%BB%E3%83%89%E3%83%AA%E3%83%B3%E3%82%AF/%E6%8A%B9%E8%8C%B6%E3%83%A9%E3%83%86%EF%BC%88HOT%20ICE%EF%BC%89.png"
+  },
+  {
+    "category": "地域限定",
+    "name": "真いか",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E5%9C%B0%E5%9F%9F%E9%99%90%E5%AE%9A/%E7%9C%9F%E3%81%84%E3%81%8B.png"
+  },
+  {
+    "category": "地域限定",
+    "name": "真いかゆず塩",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E5%9C%B0%E5%9F%9F%E9%99%90%E5%AE%9A/%E7%9C%9F%E3%81%84%E3%81%8B%E3%82%86%E3%81%9A%E5%A1%A9.png"
+  },
+  {
+    "category": "地域限定",
+    "name": "かんぴょう巻",
+    "price": 100,
+    "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E5%9C%B0%E5%9F%9F%E9%99%90%E5%AE%9A/%E3%81%8B%E3%82%93%E3%81%B4%E3%82%87%E3%81%86%E5%B7%BB.png"
+  }
+]
+
+  let total = 0;
+  let count = 0;
+  let history = [];
+  let currentCategory = null;
+
+  const categoriesDiv = document.getElementById("categories");
+  const menuDiv = document.getElementById("menu");
+  const totalDisplay = document.getElementById("totalDisplay");
+  const undoBtn = document.getElementById("undo");
+  const resetBtn = document.getElementById("reset");
+
+  function updateSummary() {
+    totalDisplay.textContent = `合計金額: ¥${total}（${count}皿）`;
+  }
+
+  function showCategory(category) {
+    currentCategory = category;
+
+    // ボタンのアクティブ切り替え
+    [...categoriesDiv.children].forEach(btn => {
+      btn.classList.toggle("active", btn.textContent === category);
+    });
+
+    menuDiv.innerHTML = "";
+
+    const filtered = menuData.filter(item => item.category === category);
+    filtered.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <img src="${item.image}" alt="${item.name}" />
+        <div>${item.name}</div>
+        <div>${item.price}円</div>
+        <button onclick='addItem(${JSON.stringify(item)})'>追加</button>
+      `;
+      menuDiv.appendChild(div);
+    });
+  }
+
+const addAudio = new Audio("add.mp3");
+const undoAudio = new Audio("undo.mp3");
+const resetAudio = new Audio("reset.mp3");
+
+function addItem(item) {
+  addAudio.currentTime = 0;
+  addAudio.play();
+
+  total += item.price;
+  count++;
+  history.push(item);
+  updateSummary();
+}
+
+function undo() {
+  if(history.length > 0){
+    undoAudio.currentTime = 0;
+    undoAudio.play();
+
+    const last = history.pop();
+    total -= last.price;
+    count--;
+    updateSummary();
+  }
+}
+
+function reset() {
+  resetAudio.currentTime = 0;
+  resetAudio.play();
+
+  total = 0;
+  count = 0;
+  history = [];
+  updateSummary();
+}
+
+
+  undoBtn.onclick = undo;
+  resetBtn.onclick = reset;
+
+  // カテゴリーを重複なしで取得しボタン生成
+const categories = [...new Set(menuData.map(item => item.category))];
+
+// ここでselectAudioを定義する
+const selectAudio = new Audio("select.mp3");
+
+// categories.forEach の部分をこのように置き換える
+categories.forEach(cat => {
+  const btn = document.createElement("button");
+  btn.textContent = cat;
+  btn.onclick = () => {
+    selectAudio.currentTime = 0;  // 音を連続再生できるように
+    selectAudio.play();
+    showCategory(cat);
+  };
+  categoriesDiv.appendChild(btn);
+});
+
+  // 最初のカテゴリーを表示
+  if(categories.length > 0) showCategory(categories[0]);
+
+  updateSummary();
+</script>
+
+</body>
+</html>
