@@ -300,8 +300,8 @@
   },
   {
     "category": "期間限定",
-    "name": "極きわみ",
-    "price": 1,
+    "name": "極",
+    "price": 1600,
     "image": "https://makisi1108.github.io/sushi-images/hama_sushi_images/%E6%9C%9F%E9%96%93%E9%99%90%E5%AE%9A/%E6%A5%B5%E3%81%8D%E3%82%8F%E3%81%BF.png"
   },
   {
@@ -1644,6 +1644,8 @@
   }
 ]
 
+
+
   let total = 0;
   let count = 0;
   let history = [];
@@ -1655,9 +1657,13 @@
   const undoBtn = document.getElementById("undo");
   const resetBtn = document.getElementById("reset");
 
-  function updateSummary() {
-    totalDisplay.textContent = `合計金額: ¥${total}（${count}皿）`;
-  }
+const TAX_RATE = 0.1; // 消費税率
+
+function updateSummary() {
+  const taxIncluded = Math.round(total * (1 + TAX_RATE)); // 税込み金額に計算
+  totalDisplay.textContent = `合計金額: ¥${taxIncluded}（${count}皿）`;
+}
+
 
   function showCategory(category) {
     currentCategory = category;
